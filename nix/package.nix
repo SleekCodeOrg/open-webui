@@ -20,7 +20,7 @@ let
       url = "https://github.com/pyodide/pyodide/releases/download/${pyodideVersion}/pyodide-${pyodideVersion}.tar.bz2";
     };
 
-    npmDepsHash = "sha256-BcSDzLg2voHyUz4cnXQ0KRNSbLCsCwJ1itEJSbfAQhU=";
+    npmDepsHash = "sha256-ofw/leDcfrc+Bp93s9BkB3WFs8qQgiWUag7gvdPJdlo=";
 
     npmFlags = [
       "--force"
