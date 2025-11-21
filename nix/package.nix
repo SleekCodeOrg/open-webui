@@ -179,7 +179,7 @@ python3Packages.buildPythonApplication rec {
       youtube-transcript-api
     ]
     ++ pyjwt.optional-dependencies.crypto
-    ++ starsessions.optional-dependencies.redis;
+    ++ lib.optionals (starsessions ? optional-dependencies.redis) starsessions.optional-dependencies.redis;
 
   pythonImportsCheck = [ "open_webui" ];
 
