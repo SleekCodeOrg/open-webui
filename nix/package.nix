@@ -54,8 +54,12 @@ let
     '';
   };
 
-  # Check if starsessions exists (not available in older nixpkgs)
+  # Check for packages not available in older nixpkgs (25.05 stable)
   hasStarsessions = python3Packages ? starsessions;
+  hasDdgs = python3Packages ? ddgs;
+  hasFirecrawlPy = python3Packages ? firecrawl-py;
+  hasGoogleGenai = python3Packages ? google-genai;
+  hasMcp = python3Packages ? mcp;
 in
 python3Packages.buildPythonApplication rec {
   inherit pname version src;
@@ -95,21 +99,18 @@ python3Packages.buildPythonApplication rec {
       boto3
       chromadb
       cryptography
-      ddgs
       docx2txt
       einops
       extract-msg
       fake-useragent
       fastapi
       faster-whisper
-      firecrawl-py
       fpdf2
       ftfy
       google-api-python-client
       google-auth-httplib2
       google-auth-oauthlib
       google-cloud-storage
-      google-genai
       google-generativeai
       googleapis-common-protos
       httpx
@@ -121,7 +122,6 @@ python3Packages.buildPythonApplication rec {
       ldap3
       loguru
       markdown
-      mcp
       nltk
       onnxruntime
       openai
@@ -180,6 +180,10 @@ python3Packages.buildPythonApplication rec {
       xlrd
       youtube-transcript-api
     ]
+    ++ lib.optionals hasDdgs [ ddgs ]
+    ++ lib.optionals hasFirecrawlPy [ firecrawl-py ]
+    ++ lib.optionals hasGoogleGenai [ google-genai ]
+    ++ lib.optionals hasMcp [ mcp ]
     ++ lib.optionals hasStarsessions [ starsessions ]
     ++ pyjwt.optional-dependencies.crypto
     ++ lib.optionals hasStarsessions starsessions.optional-dependencies.redis;
