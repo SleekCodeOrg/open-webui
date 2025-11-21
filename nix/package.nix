@@ -113,7 +113,7 @@ python3Packages.buildPythonApplication rec {
       iso-639
       itsdangerous
       langchain
-      langchain-community
+      (langchain-community.overridePythonAttrs (old: { doCheck = false; }))
       langdetect
       ldap3
       loguru
