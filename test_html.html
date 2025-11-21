@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foldable Component</title>
+    <style>
+        .foldable {
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        
+        .foldable-header {
+            padding: 12px 16px;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+        
+        .foldable-header:hover {
+            background-color: #e9ecef;
+        }
+        
+        .foldable-content {
+            padding: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+        
+        .foldable-content.open {
+            padding: 16px;
+            max-height: 500px; /* Adjust based on your content */
+        }
+        
+        .arrow {
+            transition: transform 0.3s ease;
+        }
+        
+        .arrow.open {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body>
+    <div class="foldable">
+        <div class="foldable-header" onclick="toggleFoldable(this)">
+            <span>1秒未満の思考</span>
+            <svg class="arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/>
+            </svg>
+        </div>
+        <div class="foldable-content">
+            <blockquote>
+                <p>The user says: "My embeddings aren't really working now.. Are they?" The user is probably using some system that involves embeddings...</p>
+                <div class="my-2"></div>
+                <p>We should respond politely, ask clarifying questions. We can also give generic suggestions. Let's produce.</p>
+            </blockquote>
+        </div>
+    </div>
+
+    <script>
+        function toggleFoldable(header) {
+            const content = header.nextElementSibling;
+            const arrow = header.querySelector('.arrow');
+            
+            content.classList.toggle('open');
+            arrow.classList.toggle('open');
+        }
+    </script>
+</body>
+</html>
