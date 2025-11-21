@@ -53,6 +53,9 @@ let
       runHook postInstall
     '';
   };
+
+  # Check if starsessions exists (not available in older nixpkgs)
+  hasStarsessions = python3Packages ? starsessions;
 in
 python3Packages.buildPythonApplication rec {
   inherit pname version src;
@@ -168,7 +171,6 @@ python3Packages.buildPythonApplication rec {
       sentencepiece
       soundfile
       starlette-compress
-      starsessions
       tencentcloud-sdk-python
       tiktoken
       transformers
@@ -178,8 +180,9 @@ python3Packages.buildPythonApplication rec {
       xlrd
       youtube-transcript-api
     ]
+    ++ lib.optionals hasStarsessions [ starsessions ]
     ++ pyjwt.optional-dependencies.crypto
-    ++ lib.optionals (starsessions ? optional-dependencies.redis) starsessions.optional-dependencies.redis;
+    ++ lib.optionals hasStarsessions starsessions.optional-dependencies.redis;
 
   pythonImportsCheck = [ "open_webui" ];
 
