@@ -187,8 +187,9 @@ python3Packages.buildPythonApplication rec {
   makeWrapperArgs = [ "--set FRONTEND_BUILD_DIR ${frontend}/share/open-webui" ];
 
   meta = {
-    description = "Open-WebUI development version";
-    homepage = "https://github.com/SleekCodeOrg/open-webui";
-    mainProgram = "open-webui";
-  };
+      description = "Open-WebUI development version (deprecated: use docker apps instead)";
+      homepage = "https://github.com/open-webui/open-webui";
+      mainProgram = "open-webui";
+      broken = true; # deprecated
+    };
 }
