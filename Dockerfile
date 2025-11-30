@@ -188,4 +188,19 @@ ARG BUILD_HASH
 ENV WEBUI_BUILD_VERSION=${BUILD_HASH}
 ENV DOCKER=true
 
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y </dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y wget </dev/null
+
+RUN wget -O /tmp/runsc "https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)/runsc" && \
+    wget -O /tmp/runsc.sha512 "https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)/runsc.sha512" && \
+    cd /tmp && sha512sum -c runsc.sha512 && \
+    chmod 555 /tmp/runsc && rm /tmp/runsc.sha512 && mv /tmp/runsc /usr/bin/runsc
+
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y </dev/null && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      iputils-ping sudo \
+    </dev/null && \
+    pip install matplotlib yfinance numpy
+
 CMD [ "bash", "start.sh"]
