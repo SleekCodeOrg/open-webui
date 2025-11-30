@@ -114,6 +114,7 @@ python3Packages.buildPythonApplication rec {
       itsdangerous
       langchain
       langchain-community
+      langchain-text-splitters
       langdetect
       ldap3
       loguru
