@@ -33,6 +33,7 @@
             python3Packages.hatchling
             git
             jq
+            python3Packages.langchain
             ffmpeg-headless
           ];
 
