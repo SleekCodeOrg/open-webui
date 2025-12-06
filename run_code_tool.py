@@ -208,7 +208,6 @@ class _Tools:
         # Create workspace directory structure
         persistent_home_dir = os.path.join(workspace_root, user_id)
         os.makedirs(persistent_home_dir, mode=0o755, exist_ok=True)
-        print(f"User: {user_id}" )
 
         if debug:
             await emitter.status(f"Using workspace: {persistent_home_dir}")
