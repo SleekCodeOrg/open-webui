@@ -2167,18 +2167,30 @@ class Sandbox:
             passwd_f.write("user:x:1000:1000:user:/home/user:/bin/bash\n")
 
         # Generate command line to run in the sandbox.
+        # Check if rsync is available and use it
         bash_script = f'''echo OK > /sandbox/started
-# COPY FROM PERSISTENT TO TMPFS (if persistent exists)
-if [[ -d /sandbox/persistent ]]; then
-    cp -r /sandbox/persistent/. /home/user/ 2>/dev/null || true
-fi
-# Run the interpreter
-{interpreter_path} /dev/stdin
-echo "$?" > /sandbox/.pre_exit_code || exit 1
-# COPY FROM TMPFS TO PERSISTENT (if persistent exists)
-if [[ -d /sandbox/persistent ]]; then cp -rd --one-file-system /home/user/. /sandbox/persistent/ || exit 2; fi
-mv /sandbox/.pre_exit_code /sandbox/exit_code || exit 3
-exit 0'''
+        # PRE-COPY: Copy from persistent storage to workspace (if exists)
+        if [[ -d /sandbox/persistent ]]; then
+            cp -r /sandbox/persistent/. /home/user/ 2>/dev/null || true
+        fi
+        # Run interpreter
+        {interpreter_path} /dev/stdin
+        # Record exit code
+        echo "$?" > /sandbox/.pre_exit_code || exit 1
+        # POST-COPY: Copy workspace back to persistent storage (if exists)
+        if [[ -d /sandbox/persistent ]]; then
+            # Try rsync first (handles permissions and deletes better)
+            if command -v rsync >/dev/null 2>&1; then
+                rsync -a --delete /home/user/. /sandbox/persistent/ 2>/dev/null ||
+                cp -r /home/user/. /sandbox/persistent/ 2>/dev/null || exit 2
+            else
+                # Fallback to cp with cleanup
+                rm -rf /sandbox/persistent/* /sandbox/persistent/.[!.]* /sandbox/persistent/..?* 2>/dev/null || true
+                cp -r /home/user/. /sandbox/persistent/ 2>/dev/null || exit 2
+            fi
+        fi
+        mv /sandbox/.pre_exit_code /sandbox/exit_code || exit 3
+        exit 0'''
 
         self._sandboxed_command = [shutil.which("bash"), "-c", bash_script,]
 
