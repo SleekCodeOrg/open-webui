@@ -123,11 +123,7 @@ class _Tools:
             else:
                 setattr(self.valves, valve_name, override)
 
-    async def run_bash_command(
-        self,
-        bash_command: str,
-        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
-    ) -> str:
+    async def run_bash_command(self, bash_command: str, __user__: dict = {}, __event_emitter__: typing.Callable[[dict], typing.Any] = None) -> str:
         """
         Run a bash command-line or script safely in a gVisor sandbox.
 
@@ -138,6 +134,7 @@ class _Tools:
         result = await self._run_code(
             language=Sandbox.LANGUAGE_BASH,
             code=bash_command,
+            user=__user__,
             event_emitter=__event_emitter__,
         )
         return json.dumps(
@@ -152,6 +149,7 @@ class _Tools:
     async def run_python_code(
         self,
         python_code: str,
+        __user__: dict = {},
         __event_emitter__: typing.Callable[[dict], typing.Any] = None,
     ) -> str:
         """
@@ -164,6 +162,7 @@ class _Tools:
         result = await self._run_code(
             language=Sandbox.LANGUAGE_PYTHON,
             code=python_code,
+            user=__user__,
             event_emitter=__event_emitter__,
         )
         return json.dumps(
@@ -180,6 +179,7 @@ class _Tools:
         language: str,
         code: str,
         event_emitter: typing.Callable[[dict], typing.Any] = None,
+        user: dict = None,
     ) -> str:
         """
         Run code safely in a gVisor sandbox.
@@ -193,6 +193,18 @@ class _Tools:
         valves = self.valves
         debug = valves.DEBUG
         emitter = EventEmitter(event_emitter, debug=debug)
+        print(f"Locals: {locals()}")
+
+        workspace_root = os.getenv("CODE_WORKSPACE_ROOT", "/var/lib/open-webui-dev/workspaces")
+
+        if user and isinstance(user, dict) and "id" in user: user_id = str(user["id"])
+        else: user_id = "anonymous"
+
+        # Create workspace directory structure
+        persistent_home_dir = os.path.join(workspace_root, user_id)
+        os.makedirs(persistent_home_dir, mode=0o755, exist_ok=True)
+
+        if debug: await emitter.status(f"Using workspace: {persistent_home_dir}")
 
         if valves.CHECK_FOR_UPDATES:
             if UpdateCheck.need_check():
@@ -263,7 +275,7 @@ class _Tools:
                     max_runtime_seconds=valves.MAX_RUNTIME_SECONDS,
                     max_ram_bytes=max_ram_bytes,
                     require_resource_limiting=valves.REQUIRE_RESOURCE_LIMITING,
-                    persistent_home_dir=None,
+                    persistent_home_dir=persistent_home_dir,
                 )
 
                 await emitter.status(
@@ -333,15 +345,9 @@ class _Tools:
 
 class Tools:
     Valves = _Tools.Valves
+    def __init__(self): self.valves = self.Valves()
 
-    def __init__(self):
-        self.valves = self.Valves()
-
-    async def run_bash_command(
-        self,
-        bash_command: str,
-        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
-    ) -> str:
+    async def run_bash_command(self, bash_command: str, __user__: dict, __event_emitter__: typing.Callable[[dict], typing.Any] = None) -> str:
         """
         Run a bash command-line or script safely in a gVisor sandbox.
 
@@ -349,16 +355,9 @@ class Tools:
 
         :return: A JSON object with the following fields: `status`, `output`. In most cases, when `status` is "OK", the user is interested in the content of the `output` field. Otherwise, report the `status` field first.
         """
-        return await _Tools(self.valves).run_bash_command(
-            bash_command=bash_command,
-            __event_emitter__=__event_emitter__,
-        )
+        return await _Tools(self.valves).run_bash_command(bash_command=bash_command, __event_emitter__=__event_emitter__, __user=__user__)
 
-    async def run_python_code(
-        self,
-        python_code: str,
-        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
-    ) -> str:
+    async def run_python_code(self, python_code: str, __user__: dict, __event_emitter__: typing.Callable[[dict], typing.Any] = None) -> str:
         """
         Run Python code safely in a gVisor sandbox.
 
@@ -366,10 +365,7 @@ class Tools:
 
         :return: A JSON object with the following fields: `status`, `output`. In most cases, when `status` is "OK", the user is interested in the content of the `output` field. Otherwise, report the `status` field first.
         """
-        return await _Tools(self.valves).run_python_code(
-            python_code=python_code,
-            __event_emitter__=__event_emitter__,
-        )
+        return await _Tools(self.valves).run_python_code(python_code=python_code, __event_emitter__=__event_emitter__, __user__=__user__)
 
 
 class EventEmitter:
@@ -2813,4 +2809,3 @@ if __name__ == "__main__":
             print(output_str)
 
     asyncio.run(_local_run())
-
