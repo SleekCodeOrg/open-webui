@@ -1,0 +1,48 @@
+#+title: Readme_sleek
+
+* Index
+Command to make docker run 
+
+First: 
+
+#+begin_src sh
+docker run --rm \
+            --name open-webui-dev \
+            --network=host \
+            \
+            --privileged \
+            -v /home/jjs/proj/work/gartner/open-webui/data/:/app/backend/data \
+            -e WEBUI_SECRET_KEY=ZnHYlldge6/o9V3mm/zkQKB1Ezvp/hdTdCHtMIoj/n/45No \
+            open-webui-local
+#+end_src
+
+Then: 
+#+begin_src sh
+docker run --rm \
+  --name test-cgroup-fix \
+  --runtime=runc \
+  -p 8080:8080 \
+  --security-opt seccomp=unconfined \
+  --security-opt apparmor=unconfined \
+  --cap-add=SYS_ADMIN --cap-add=SYS_RESOURCE --cap-add=SYS_PTRACE --cap-add=IPC_LOCK --cap-add=MKNOD \
+  --ulimit nofile=65536:65536 \
+  --mount type=bind,source=/proc,target=/proc2,readonly=false,bind-recursive=disabled \
+  -v /home/jjs/proj/work/gartner/open-webui/data/:/app/backend/data \
+  -e WEBUI_SECRET_KEY=ZnHYlldge6/o9V3mm/zkQKB1Ezvp/hdTdCHtMIoj/n/45No \
+  --entrypoint sh \
+  open-webui-local -c "mount -o remount,rw /sys/fs/cgroup && /app/backend/start.sh"
+#+end_src
+
+#+begin_src 
+docker run --rm \
+  --name test-safe-sandbox \
+  -p 8080:8080 \
+  --cap-add=SYS_ADMIN --cap-add=SYS_RESOURCE --cap-add=SYS_PTRACE \
+  --ulimit nofile=65536:65536 \
+  --mount type=bind,source=/proc,target=/proc2,readonly=false,bind-recursive=disabled \
+  -v /home/jjs/proj/work/gartner/open-webui/data/:/app/backend/data \
+  -e WEBUI_SECRET_KEY=ZnHYlldge6/o9V3mm/zkQKB1Ezvp/hdTdCHtMIoj/n/45No \
+  --security-opt seccomp=unconfined \
+  --entrypoint sh \
+  open-webui-local -c "mount -o remount,rw /sys/fs/cgroup && /app/backend/start.sh"
+#+end_src
