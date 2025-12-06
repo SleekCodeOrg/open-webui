@@ -199,7 +199,7 @@ RUN wget -O /tmp/runsc "https://storage.googleapis.com/gvisor/releases/release/l
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y </dev/null && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
-      iputils-ping sudo \
+      iputils-ping sudo rsync \
     </dev/null && \
     pip install matplotlib yfinance numpy
 
