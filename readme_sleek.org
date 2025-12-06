@@ -1,8 +1,7 @@
 #+title: Readme_sleek
 
-* Index
+* Running the docker container 
 Command to make docker run 
-
 First: 
 
 #+begin_src sh
@@ -46,3 +45,16 @@ docker run --rm \
   --entrypoint sh \
   open-webui-local -c "mount -o remount,rw /sys/fs/cgroup && /app/backend/start.sh"
 #+end_src
+
+* Developing the tool 
+To develop the tool we need to run the container.
+This is currently done automatically by the nixOS system I set up, but you can also run the docker container like described above.
+
+Then you can connect to the docker container like this: 
+
+#+begin_src sh
+docker exec -it open-webui-dev /bin/bash
+#+end_src
+
+Then, inside the docker container, you can use the =test_workspace.py=  and =run_code_tool.py= files to do development.
+The =test_workspace.py= does some basic emulation of what a LLM call looks like. You get back the result etc.
