@@ -2168,20 +2168,20 @@ class Sandbox:
             passwd_f.write("user:x:1000:1000:user:/home/user:/bin/bash\n")
 
         # Generate command line to run in the sandbox.
-        self._sandboxed_command = [
-            shutil.which("bash"),
-            "-c",
-            "; ".join(
-                (
-                    "echo OK > /sandbox/started",
-                    f"{interpreter_path} /dev/stdin",
-                    'echo "$?" > /sandbox/.pre_exit_code || exit 1',
-                    "if [[ -d /sandbox/persistent ]]; then cp -rd --one-file-system /home/user/. /sandbox/persistent/ || exit 2; fi",
-                    "mv /sandbox/.pre_exit_code /sandbox/exit_code || exit 3",
-                    "exit 0",
-                )
-            ),
-        ]
+        bash_script = f'''echo OK > /sandbox/started
+# COPY FROM PERSISTENT TO TMPFS (if persistent exists)
+if [[ -d /sandbox/persistent ]]; then
+    cp -r /sandbox/persistent/. /home/user/ 2>/dev/null || true
+fi
+# Run the interpreter
+{interpreter_path} /dev/stdin
+echo "$?" > /sandbox/.pre_exit_code || exit 1
+# COPY FROM TMPFS TO PERSISTENT (if persistent exists)
+if [[ -d /sandbox/persistent ]]; then cp -rd --one-file-system /home/user/. /sandbox/persistent/ || exit 2; fi
+mv /sandbox/.pre_exit_code /sandbox/exit_code || exit 3
+exit 0'''
+
+        self._sandboxed_command = [shutil.which("bash"), "-c", bash_script,]
 
         # Run as root inside the gVisor sandbox, but WITHOUT the inner unshare/uid_map.
         # This avoids touching /proc/self/uid_map inside gVisor while keeping the original
