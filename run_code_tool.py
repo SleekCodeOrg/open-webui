@@ -198,7 +198,9 @@ class _Tools:
         valves = self.valves
         debug = valves.DEBUG
         emitter = EventEmitter(event_emitter, debug=debug)
-        workspace_root = os.getenv("CODE_WORKSPACE_ROOT", "/app/backend/data/workspaces/")
+        workspace_root = os.getenv(
+            "CODE_WORKSPACE_ROOT", "/app/backend/data/workspaces/"
+        )
 
         if user and isinstance(user, dict) and "id" in user:
             user_id = str(user["id"])
@@ -2168,7 +2170,7 @@ class Sandbox:
 
         # Generate command line to run in the sandbox.
         # Check if rsync is available and use it
-        bash_script = f'''echo OK > /sandbox/started
+        bash_script = f"""echo OK > /sandbox/started
         # PRE-COPY: Copy from persistent storage to workspace (if exists)
         if [[ -d /sandbox/persistent ]]; then
             cp -r /sandbox/persistent/. /home/user/ 2>/dev/null || true
@@ -2190,9 +2192,13 @@ class Sandbox:
             fi
         fi
         mv /sandbox/.pre_exit_code /sandbox/exit_code || exit 3
-        exit 0'''
+        exit 0"""
 
-        self._sandboxed_command = [shutil.which("bash"), "-c", bash_script,]
+        self._sandboxed_command = [
+            shutil.which("bash"),
+            "-c",
+            bash_script,
+        ]
 
         # Run as root inside the gVisor sandbox, but WITHOUT the inner unshare/uid_map.
         # This avoids touching /proc/self/uid_map inside gVisor while keeping the original
@@ -2818,7 +2824,55 @@ if __name__ == "__main__":
     else:
         code = sys.stdin.read()
 
-    user = {'id': '99d75aae-624b-4493-a2fd-3452a781a395', 'name': 'Jiyan Jonas Schneider', 'email': 'open-webui-dev@jiyanjs.com', 'username': None, 'role': 'admin', 'profile_image_url': '/user.png', 'bio': None, 'gender': None, 'date_of_birth': None, 'info': None, 'settings': {'ui': {'version': '0.6.40', 'models': ['deepseek-chat'], 'pinnedModels': ['gemma3:27b', 'openrouter.google/gemini-2.5-pro', 'openrouter.moonshotai/kimi-k2-0905', 'gpt-oss:20b', 'llamacpp./home/jjs/.cache/llama.cpp/ggml-org_gpt-oss-20b-GGUF_gpt-oss-20b-mxfp4.gguf', 'deepseek-chat', 'deepseek-reasoner', 'openrouter.openai/gpt-5.1', 'sc-datascientist', 'openrouter.google/gemini-3-pro-preview', 'openrouter.deepseek/deepseek-v3.2-speciale', 'openrouter.deepseek/deepseek-v3.2', 'deepseek-speciale.deepseek-reasoner'], 'speechAutoSend': False, 'notificationEnabled': True, 'params': {}, 'memory': True, 'largeTextAsFile': True, 'imageCompressionSize': {'width': '', 'height': ''}, 'widescreenMode': False, 'showUsername': False, 'webSearch': None, 'ctrlEnterToSend': True}}, 'api_key': None, 'oauth_sub': None, 'last_active_at': 1765032070, 'updated_at': 1762054905, 'created_at': 1762054905}
+    user = {
+        "id": "99d75aae-624b-4493-a2fd-3452a781a395",
+        "name": "Jiyan Jonas Schneider",
+        "email": "open-webui-dev@jiyanjs.com",
+        "username": None,
+        "role": "admin",
+        "profile_image_url": "/user.png",
+        "bio": None,
+        "gender": None,
+        "date_of_birth": None,
+        "info": None,
+        "settings": {
+            "ui": {
+                "version": "0.6.40",
+                "models": ["deepseek-chat"],
+                "pinnedModels": [
+                    "gemma3:27b",
+                    "openrouter.google/gemini-2.5-pro",
+                    "openrouter.moonshotai/kimi-k2-0905",
+                    "gpt-oss:20b",
+                    "llamacpp./home/jjs/.cache/llama.cpp/ggml-org_gpt-oss-20b-GGUF_gpt-oss-20b-mxfp4.gguf",
+                    "deepseek-chat",
+                    "deepseek-reasoner",
+                    "openrouter.openai/gpt-5.1",
+                    "sc-datascientist",
+                    "openrouter.google/gemini-3-pro-preview",
+                    "openrouter.deepseek/deepseek-v3.2-speciale",
+                    "openrouter.deepseek/deepseek-v3.2",
+                    "deepseek-speciale.deepseek-reasoner",
+                ],
+                "speechAutoSend": False,
+                "notificationEnabled": True,
+                "params": {},
+                "memory": True,
+                "largeTextAsFile": True,
+                "imageCompressionSize": {"width": "", "height": ""},
+                "widescreenMode": False,
+                "showUsername": False,
+                "webSearch": None,
+                "ctrlEnterToSend": True,
+            }
+        },
+        "api_key": None,
+        "oauth_sub": None,
+        "last_active_at": 1765032070,
+        "updated_at": 1762054905,
+        "created_at": 1762054905,
+    }
+
     async def _local_run():
         def _dummy_emitter(event):
             if not args.want_status:
@@ -2827,7 +2881,9 @@ if __name__ == "__main__":
         tools = Tools()
         if args.language == "bash":
             output_str = await tools.run_bash_command(
-                bash_command=code, __user__=user, __event_emitter__=_dummy_emitter,
+                bash_command=code,
+                __user__=user,
+                __event_emitter__=_dummy_emitter,
             )
         else:
             output_str = await tools.run_python_code(
