@@ -200,7 +200,21 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y </dev/null && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
       iputils-ping sudo rsync \
+      git openssh-client \
+      curl wget ca-certificates unzip \
+      build-essential gfortran pkg-config python3-dev \
+      libopenblas-dev liblapack-dev \
+      libssl-dev libffi-dev \
+      graphviz \
     </dev/null && \
-    pip install matplotlib yfinance numpy
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir \
+      numpy pandas scipy statsmodels \
+      matplotlib seaborn plotly altair \
+      scikit-learn \
+      pymc arviz \
+      pyarrow polars duckdb \
+      openpyxl lxml beautifulsoup4 \
+      yfinance
 
 CMD [ "bash", "start.sh"]
