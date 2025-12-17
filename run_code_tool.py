@@ -2167,6 +2167,7 @@ class Sandbox:
             hostname_f.write("sandbox\n")
         with open(os.path.join(rootfs_path, "etc/passwd"), "w") as passwd_f:
             passwd_f.write("user:x:1000:1000:user:/home/user:/bin/bash\n")
+            passwd_f.write("root:x:0:0:root:/home/user:/bin/bash\n")
 
         # Generate command line to run in the sandbox.
         # Check if rsync is available and use it
