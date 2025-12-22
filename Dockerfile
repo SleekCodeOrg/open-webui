@@ -191,4 +191,33 @@ ARG BUILD_HASH
 ENV WEBUI_BUILD_VERSION=${BUILD_HASH}
 ENV DOCKER=true
 
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y </dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y wget </dev/null
+
+RUN wget -O /tmp/runsc "https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)/runsc" && \
+    wget -O /tmp/runsc.sha512 "https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)/runsc.sha512" && \
+    cd /tmp && sha512sum -c runsc.sha512 && \
+    chmod 555 /tmp/runsc && rm /tmp/runsc.sha512 && mv /tmp/runsc /usr/bin/runsc
+
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y </dev/null && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      iputils-ping sudo rsync \
+      git openssh-client \
+      curl wget ca-certificates unzip \
+      build-essential gfortran pkg-config python3-dev \
+      libopenblas-dev liblapack-dev \
+      libssl-dev libffi-dev \
+      graphviz \
+    </dev/null && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir \
+      numpy pandas scipy statsmodels \
+      matplotlib seaborn plotly altair \
+      scikit-learn \
+      pymc arviz \
+      pyarrow polars duckdb \
+      openpyxl lxml beautifulsoup4 \
+      yfinance
+
 CMD [ "bash", "start.sh"]
