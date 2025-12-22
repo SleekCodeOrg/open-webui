@@ -179,6 +179,733 @@ class _Tools:
             ensure_ascii=False,
         )
 
+    async def read_file(
+        self,
+        file_path: str,
+        __user__: dict = {},
+        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
+    ) -> str:
+        """
+        Read the contents of a file from the user's workspace.
+
+        :param file_path: Path to the file relative to the user's workspace (e.g., "notes.txt" or "project/main.py").
+
+        :return: A JSON object with the following fields: `file_path`, `status`, `content`. When `status` is "OK", the `content` field contains the file contents. Otherwise, `content` contains an error message.
+        """
+        valves = self.valves
+        debug = valves.DEBUG
+        emitter = EventEmitter(__event_emitter__, debug=debug)
+        workspace_root = os.getenv(
+            "CODE_WORKSPACE_ROOT", "/app/backend/data/workspaces/"
+        )
+
+        if __user__ and isinstance(__user__, dict) and "id" in __user__:
+            user_id = str(__user__["id"])
+        else:
+            user_id = "anonymous"
+
+        persistent_home_dir = os.path.join(workspace_root, user_id)
+        os.makedirs(persistent_home_dir, mode=0o755, exist_ok=True)
+
+        # Security: Prevent path traversal
+        file_path = file_path.lstrip("/")
+        full_path = os.path.normpath(os.path.join(persistent_home_dir, file_path))
+        if not full_path.startswith(persistent_home_dir):
+            await emitter.fail("Invalid file path: path traversal not allowed")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "ERROR",
+                    "content": "Invalid file path: path traversal not allowed",
+                },
+                ensure_ascii=False,
+            )
+
+        await emitter.status(f"Reading file: {file_path}")
+
+        try:
+            if not os.path.exists(full_path):
+                await emitter.fail(f"File not found: {file_path}")
+                return json.dumps(
+                    {
+                        "file_path": file_path,
+                        "status": "NOT_FOUND",
+                        "content": f"File not found: {file_path}",
+                    },
+                    ensure_ascii=False,
+                )
+
+            if os.path.isdir(full_path):
+                # List directory contents instead
+                entries = os.listdir(full_path)
+                await emitter.status(status="complete", done=True, description=f"Listed directory: {file_path}")
+                return json.dumps(
+                    {
+                        "file_path": file_path,
+                        "status": "OK",
+                        "content": f"Directory listing:\n" + "\n".join(sorted(entries)),
+                        "is_directory": True,
+                    },
+                    ensure_ascii=False,
+                )
+
+            with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+
+            await emitter.status(status="complete", done=True, description=f"Read file: {file_path}")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "OK",
+                    "content": content,
+                },
+                ensure_ascii=False,
+            )
+        except Exception as e:
+            await emitter.fail(f"Error reading file: {e}")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "ERROR",
+                    "content": f"Error reading file: {e}",
+                },
+                ensure_ascii=False,
+            )
+
+    async def write_file(
+        self,
+        file_path: str,
+        content: str,
+        __user__: dict = {},
+        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
+    ) -> str:
+        """
+        Create or overwrite a file in the user's workspace.
+
+        :param file_path: Path to the file relative to the user's workspace (e.g., "notes.txt" or "project/main.py"). Directories will be created automatically.
+        :param content: The content to write to the file.
+
+        :return: A JSON object with the following fields: `file_path`, `status`, `message`. When `status` is "OK", the file was written successfully.
+        """
+        valves = self.valves
+        debug = valves.DEBUG
+        emitter = EventEmitter(__event_emitter__, debug=debug)
+        workspace_root = os.getenv(
+            "CODE_WORKSPACE_ROOT", "/app/backend/data/workspaces/"
+        )
+
+        if __user__ and isinstance(__user__, dict) and "id" in __user__:
+            user_id = str(__user__["id"])
+        else:
+            user_id = "anonymous"
+
+        persistent_home_dir = os.path.join(workspace_root, user_id)
+        os.makedirs(persistent_home_dir, mode=0o755, exist_ok=True)
+
+        # Security: Prevent path traversal
+        file_path = file_path.lstrip("/")
+        full_path = os.path.normpath(os.path.join(persistent_home_dir, file_path))
+        if not full_path.startswith(persistent_home_dir):
+            await emitter.fail("Invalid file path: path traversal not allowed")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "ERROR",
+                    "message": "Invalid file path: path traversal not allowed",
+                },
+                ensure_ascii=False,
+            )
+
+        await emitter.status(f"Writing file: {file_path}")
+
+        try:
+            # Create parent directories if needed
+            parent_dir = os.path.dirname(full_path)
+            if parent_dir:
+                os.makedirs(parent_dir, mode=0o755, exist_ok=True)
+
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            await emitter.status(status="complete", done=True, description=f"Wrote file: {file_path}")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "OK",
+                    "message": f"Successfully wrote {len(content)} characters to {file_path}",
+                },
+                ensure_ascii=False,
+            )
+        except Exception as e:
+            await emitter.fail(f"Error writing file: {e}")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "ERROR",
+                    "message": f"Error writing file: {e}",
+                },
+                ensure_ascii=False,
+            )
+
+    async def edit_file(
+        self,
+        file_path: str,
+        old_text: str,
+        new_text: str,
+        __user__: dict = {},
+        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
+    ) -> str:
+        """
+        Edit a file by replacing text. Finds the first occurrence of old_text and replaces it with new_text.
+
+        :param file_path: Path to the file relative to the user's workspace (e.g., "notes.txt" or "project/main.py").
+        :param old_text: The exact text to find in the file.
+        :param new_text: The text to replace it with.
+
+        :return: A JSON object with the following fields: `file_path`, `status`, `message`. When `status` is "OK", the edit was successful.
+        """
+        valves = self.valves
+        debug = valves.DEBUG
+        emitter = EventEmitter(__event_emitter__, debug=debug)
+        workspace_root = os.getenv(
+            "CODE_WORKSPACE_ROOT", "/app/backend/data/workspaces/"
+        )
+
+        if __user__ and isinstance(__user__, dict) and "id" in __user__:
+            user_id = str(__user__["id"])
+        else:
+            user_id = "anonymous"
+
+        persistent_home_dir = os.path.join(workspace_root, user_id)
+        os.makedirs(persistent_home_dir, mode=0o755, exist_ok=True)
+
+        # Security: Prevent path traversal
+        file_path = file_path.lstrip("/")
+        full_path = os.path.normpath(os.path.join(persistent_home_dir, file_path))
+        if not full_path.startswith(persistent_home_dir):
+            await emitter.fail("Invalid file path: path traversal not allowed")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "ERROR",
+                    "message": "Invalid file path: path traversal not allowed",
+                },
+                ensure_ascii=False,
+            )
+
+        await emitter.status(f"Editing file: {file_path}")
+
+        try:
+            if not os.path.exists(full_path):
+                await emitter.fail(f"File not found: {file_path}")
+                return json.dumps(
+                    {
+                        "file_path": file_path,
+                        "status": "NOT_FOUND",
+                        "message": f"File not found: {file_path}",
+                    },
+                    ensure_ascii=False,
+                )
+
+            with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+
+            if old_text not in content:
+                await emitter.fail(f"Text not found in file")
+                return json.dumps(
+                    {
+                        "file_path": file_path,
+                        "status": "NOT_FOUND",
+                        "message": "The specified text was not found in the file",
+                    },
+                    ensure_ascii=False,
+                )
+
+            # Replace first occurrence
+            new_content = content.replace(old_text, new_text, 1)
+
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(new_content)
+
+            await emitter.status(status="complete", done=True, description=f"Edited file: {file_path}")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "OK",
+                    "message": f"Successfully replaced text in {file_path}",
+                },
+                ensure_ascii=False,
+            )
+        except Exception as e:
+            await emitter.fail(f"Error editing file: {e}")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "ERROR",
+                    "message": f"Error editing file: {e}",
+                },
+                ensure_ascii=False,
+            )
+
+    async def display_image(
+        self,
+        file_path: str,
+        __user__: dict = {},
+        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
+    ) -> str:
+        """
+        Display an image file from the user's workspace. The image will be shown inline in the chat.
+
+        :param file_path: Path to the image file relative to the user's workspace (e.g., "photo.jpg" or "screenshots/capture.png"). Supports PNG, JPG, JPEG, GIF, WEBP, and SVG formats.
+
+        :return: A JSON object with the following fields: `file_path`, `status`, `message`. When `status` is "OK", the image has been displayed to the user.
+        """
+        valves = self.valves
+        debug = valves.DEBUG
+        emitter = EventEmitter(__event_emitter__, debug=debug)
+        workspace_root = os.getenv(
+            "CODE_WORKSPACE_ROOT", "/app/backend/data/workspaces/"
+        )
+
+        if __user__ and isinstance(__user__, dict) and "id" in __user__:
+            user_id = str(__user__["id"])
+        else:
+            user_id = "anonymous"
+
+        persistent_home_dir = os.path.join(workspace_root, user_id)
+        os.makedirs(persistent_home_dir, mode=0o755, exist_ok=True)
+
+        # Security: Prevent path traversal
+        file_path = file_path.lstrip("/")
+        full_path = os.path.normpath(os.path.join(persistent_home_dir, file_path))
+        if not full_path.startswith(persistent_home_dir):
+            await emitter.fail("Invalid file path: path traversal not allowed")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "ERROR",
+                    "message": "Invalid file path: path traversal not allowed",
+                },
+                ensure_ascii=False,
+            )
+
+        await emitter.status(f"Loading image: {file_path}")
+
+        try:
+            if not os.path.exists(full_path):
+                await emitter.fail(f"Image not found: {file_path}")
+                return json.dumps(
+                    {
+                        "file_path": file_path,
+                        "status": "NOT_FOUND",
+                        "message": f"Image not found: {file_path}",
+                    },
+                    ensure_ascii=False,
+                )
+
+            # Determine MIME type from extension
+            ext = os.path.splitext(file_path)[1].lower()
+            mime_types = {
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".gif": "image/gif",
+                ".webp": "image/webp",
+                ".svg": "image/svg+xml",
+                ".bmp": "image/bmp",
+            }
+
+            mime_type = mime_types.get(ext)
+            if not mime_type:
+                await emitter.fail(f"Unsupported image format: {ext}")
+                return json.dumps(
+                    {
+                        "file_path": file_path,
+                        "status": "ERROR",
+                        "message": f"Unsupported image format: {ext}. Supported formats: {', '.join(mime_types.keys())}",
+                    },
+                    ensure_ascii=False,
+                )
+
+            # Get file size for info
+            file_size = os.path.getsize(full_path)
+            size_str = f"{file_size / 1024:.1f} KB" if file_size < 1024 * 1024 else f"{file_size / (1024 * 1024):.1f} MB"
+
+            # Try to use Open WebUI's internal file storage for proper serving
+            try:
+                from open_webui.models.files import Files, FileForm
+                from open_webui.storage.provider import Storage
+                import uuid as uuid_module
+                import io
+
+                print(f"[display_image] Starting upload for: {full_path}", file=sys.stderr)
+                print(f"[display_image] User ID: {user_id}", file=sys.stderr)
+                print(f"[display_image] MIME type: {mime_type}", file=sys.stderr)
+
+                await emitter.status(f"Uploading image to Open WebUI storage...")
+
+                # Generate a unique file ID
+                file_id = str(uuid_module.uuid4())
+                filename = os.path.basename(file_path)
+                storage_filename = f"{file_id}_{filename}"
+
+                print(f"[display_image] Generated file_id: {file_id}", file=sys.stderr)
+                print(f"[display_image] Storage filename: {storage_filename}", file=sys.stderr)
+
+                # Read the file and upload to storage
+                with open(full_path, "rb") as f:
+                    file_contents = f.read()
+
+                print(f"[display_image] Read {len(file_contents)} bytes from file", file=sys.stderr)
+
+                # Upload to Open WebUI storage
+                upload_result = Storage.upload_file(
+                    io.BytesIO(file_contents),
+                    storage_filename,
+                    {
+                        "OpenWebUI-User-Id": user_id,
+                        "OpenWebUI-File-Id": file_id,
+                    },
+                )
+                print(f"[display_image] Storage.upload_file returned: {upload_result}", file=sys.stderr)
+
+                _, storage_path = upload_result
+
+                print(f"[display_image] Storage path: {storage_path}", file=sys.stderr)
+
+                # Register in Files database
+                file_item = Files.insert_new_file(
+                    user_id,
+                    FileForm(
+                        id=file_id,
+                        filename=filename,
+                        path=storage_path,
+                        data={},
+                        meta={
+                            "name": filename,
+                            "content_type": mime_type,
+                            "size": file_size,
+                            "source": "workspace",
+                        },
+                    ),
+                )
+
+                print(f"[display_image] Files.insert_new_file returned: {file_item}", file=sys.stderr)
+
+                if file_item:
+                    # Use Open WebUI's file serving endpoint
+                    image_url = f"/api/v1/files/{file_id}/content"
+
+                    print(f"[display_image] Constructed image_url: {image_url}", file=sys.stderr)
+
+                    # Try using the 'files' event type for proper file attachment handling
+                    # This should bypass frontend URL rewriting that affects markdown images
+                    files_event = {
+                        "type": "files",
+                        "data": {
+                            "files": [
+                                {
+                                    "type": "image",
+                                    "url": image_url,
+                                    "name": filename,
+                                    "id": file_id,
+                                }
+                            ]
+                        },
+                    }
+                    print(f"[display_image] Emitting files event: {files_event}", file=sys.stderr)
+
+                    if __event_emitter__:
+                        # First, emit a message event to ensure there's content to attach to
+                        # This helps prevent race conditions where files event arrives before message
+                        message_event = {
+                            "type": "message",
+                            "data": {
+                                "content": f"\n\n**{filename}** ({size_str})\n\n"
+                            },
+                        }
+                        try:
+                            result = __event_emitter__(message_event)
+                            if asyncio.isfuture(result) or inspect.isawaitable(result):
+                                await result
+                            print(f"[display_image] Message event emitted", file=sys.stderr)
+                        except Exception as emit_err:
+                            print(f"[display_image] Error emitting message event: {emit_err}", file=sys.stderr)
+
+                        # Small delay to ensure message is processed
+                        await asyncio.sleep(0.1)
+
+                        # Now emit the files event to attach the image
+                        try:
+                            result = __event_emitter__(files_event)
+                            if asyncio.isfuture(result) or inspect.isawaitable(result):
+                                await result
+                            print(f"[display_image] Files event emitted successfully", file=sys.stderr)
+                        except Exception as emit_err:
+                            print(f"[display_image] Error emitting files event: {emit_err}", file=sys.stderr)
+
+                        # Another small delay to ensure files event is processed before completion
+                        await asyncio.sleep(0.1)
+
+                    await emitter.status(status="complete", done=True, description=f"Displayed image: {file_path}")
+                    return json.dumps(
+                        {
+                            "file_path": file_path,
+                            "status": "OK",
+                            "message": f"Image displayed successfully ({size_str})",
+                            "file_id": file_id,
+                            "url": image_url,
+                        },
+                        ensure_ascii=False,
+                    )
+                else:
+                    raise Exception("Failed to register file in database")
+
+            except ImportError as e:
+                # Fallback: Open WebUI modules not available (e.g., running standalone)
+                # Use base64 data URL as fallback
+                if debug:
+                    await emitter.status(f"Open WebUI modules not available, using base64 fallback: {e}")
+
+                with open(full_path, "rb") as f:
+                    image_data = f.read()
+
+                image_base64 = base64.b64encode(image_data).decode("utf-8")
+                data_url = f"data:{mime_type};base64,{image_base64}"
+
+                # Emit the image as a message with markdown
+                await emitter.message(f"\n\n![{os.path.basename(file_path)}]({data_url})\n\n")
+
+                await emitter.status(status="complete", done=True, description=f"Displayed image: {file_path}")
+                return json.dumps(
+                    {
+                        "file_path": file_path,
+                        "status": "OK",
+                        "message": f"Image displayed successfully ({size_str}) [base64 fallback]",
+                    },
+                    ensure_ascii=False,
+                )
+
+        except Exception as e:
+            await emitter.fail(f"Error displaying image: {e}")
+            return json.dumps(
+                {
+                    "file_path": file_path,
+                    "status": "ERROR",
+                    "message": f"Error displaying image: {e}",
+                },
+                ensure_ascii=False,
+            )
+
+    async def display_images(
+        self,
+        file_paths: list[str],
+        __user__: dict = {},
+        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
+    ) -> str:
+        """
+        Display multiple image files from the user's workspace as a gallery. All images will be shown together inline in the chat.
+
+        :param file_paths: List of paths to image files relative to the user's workspace (e.g., ["photo1.jpg", "photo2.png", "screenshots/img.gif"]). Supports PNG, JPG, JPEG, GIF, WEBP, and SVG formats.
+
+        :return: A JSON object with the following fields: `file_paths`, `status`, `message`, `results`. When `status` is "OK", all images have been displayed.
+        """
+        valves = self.valves
+        debug = valves.DEBUG
+        emitter = EventEmitter(__event_emitter__, debug=debug)
+        workspace_root = os.getenv(
+            "CODE_WORKSPACE_ROOT", "/app/backend/data/workspaces/"
+        )
+
+        if __user__ and isinstance(__user__, dict) and "id" in __user__:
+            user_id = str(__user__["id"])
+        else:
+            user_id = "anonymous"
+
+        persistent_home_dir = os.path.join(workspace_root, user_id)
+        os.makedirs(persistent_home_dir, mode=0o755, exist_ok=True)
+
+        mime_types = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+            ".svg": "image/svg+xml",
+            ".bmp": "image/bmp",
+        }
+
+        await emitter.status(f"Loading {len(file_paths)} images...")
+
+        results = []
+        files_for_event = []
+
+        try:
+            from open_webui.models.files import Files, FileForm
+            from open_webui.storage.provider import Storage
+            import uuid as uuid_module
+            import io
+
+            for file_path in file_paths:
+                # Security: Prevent path traversal
+                clean_path = file_path.lstrip("/")
+                full_path = os.path.normpath(os.path.join(persistent_home_dir, clean_path))
+                if not full_path.startswith(persistent_home_dir):
+                    results.append({
+                        "file_path": file_path,
+                        "status": "ERROR",
+                        "message": "Invalid file path: path traversal not allowed",
+                    })
+                    continue
+
+                if not os.path.exists(full_path):
+                    results.append({
+                        "file_path": file_path,
+                        "status": "NOT_FOUND",
+                        "message": f"Image not found: {file_path}",
+                    })
+                    continue
+
+                ext = os.path.splitext(file_path)[1].lower()
+                mime_type = mime_types.get(ext)
+                if not mime_type:
+                    results.append({
+                        "file_path": file_path,
+                        "status": "ERROR",
+                        "message": f"Unsupported image format: {ext}",
+                    })
+                    continue
+
+                file_size = os.path.getsize(full_path)
+                size_str = f"{file_size / 1024:.1f} KB" if file_size < 1024 * 1024 else f"{file_size / (1024 * 1024):.1f} MB"
+
+                # Generate unique file ID and upload
+                file_id = str(uuid_module.uuid4())
+                filename = os.path.basename(file_path)
+                storage_filename = f"{file_id}_{filename}"
+
+                with open(full_path, "rb") as f:
+                    file_contents = f.read()
+
+                upload_result = Storage.upload_file(
+                    io.BytesIO(file_contents),
+                    storage_filename,
+                    {
+                        "OpenWebUI-User-Id": user_id,
+                        "OpenWebUI-File-Id": file_id,
+                    },
+                )
+                _, storage_path = upload_result
+
+                # Register in Files database
+                file_item = Files.insert_new_file(
+                    user_id,
+                    FileForm(
+                        id=file_id,
+                        filename=filename,
+                        path=storage_path,
+                        data={},
+                        meta={
+                            "name": filename,
+                            "content_type": mime_type,
+                            "size": file_size,
+                            "source": "workspace",
+                        },
+                    ),
+                )
+
+                if file_item:
+                    image_url = f"/api/v1/files/{file_id}/content"
+                    files_for_event.append({
+                        "type": "image",
+                        "url": image_url,
+                        "name": filename,
+                        "id": file_id,
+                    })
+                    results.append({
+                        "file_path": file_path,
+                        "status": "OK",
+                        "message": f"Image loaded ({size_str})",
+                        "file_id": file_id,
+                        "url": image_url,
+                    })
+                else:
+                    results.append({
+                        "file_path": file_path,
+                        "status": "ERROR",
+                        "message": "Failed to register file in database",
+                    })
+
+            # Emit all images in a single files event
+            if files_for_event and __event_emitter__:
+                # First emit a message with image names
+                image_names = ", ".join([f["name"] for f in files_for_event])
+                message_event = {
+                    "type": "message",
+                    "data": {
+                        "content": f"\n\n**Images:** {image_names}\n\n"
+                    },
+                }
+                try:
+                    result = __event_emitter__(message_event)
+                    if asyncio.isfuture(result) or inspect.isawaitable(result):
+                        await result
+                except Exception as emit_err:
+                    print(f"[display_images] Error emitting message event: {emit_err}", file=sys.stderr)
+
+                await asyncio.sleep(0.1)
+
+                # Now emit all files in one event
+                files_event = {
+                    "type": "files",
+                    "data": {
+                        "files": files_for_event
+                    },
+                }
+                try:
+                    result = __event_emitter__(files_event)
+                    if asyncio.isfuture(result) or inspect.isawaitable(result):
+                        await result
+                    print(f"[display_images] Files event emitted with {len(files_for_event)} images", file=sys.stderr)
+                except Exception as emit_err:
+                    print(f"[display_images] Error emitting files event: {emit_err}", file=sys.stderr)
+
+                await asyncio.sleep(0.1)
+
+            success_count = sum(1 for r in results if r["status"] == "OK")
+            await emitter.status(status="complete", done=True, description=f"Displayed {success_count}/{len(file_paths)} images")
+
+            return json.dumps(
+                {
+                    "file_paths": file_paths,
+                    "status": "OK" if success_count == len(file_paths) else "PARTIAL" if success_count > 0 else "ERROR",
+                    "message": f"Displayed {success_count}/{len(file_paths)} images successfully",
+                    "results": results,
+                },
+                ensure_ascii=False,
+            )
+
+        except ImportError as e:
+            await emitter.fail(f"Open WebUI modules not available: {e}")
+            return json.dumps(
+                {
+                    "file_paths": file_paths,
+                    "status": "ERROR",
+                    "message": f"Open WebUI modules not available: {e}",
+                },
+                ensure_ascii=False,
+            )
+        except Exception as e:
+            await emitter.fail(f"Error displaying images: {e}")
+            return json.dumps(
+                {
+                    "file_paths": file_paths,
+                    "status": "ERROR",
+                    "message": f"Error displaying images: {e}",
+                },
+                ensure_ascii=False,
+            )
+
     async def _run_code(
         self,
         language: str,
@@ -391,6 +1118,110 @@ class Tools:
         """
         return await _Tools(self.valves).run_python_code(
             python_code=python_code,
+            __event_emitter__=__event_emitter__,
+            __user__=__user__,
+        )
+
+    async def read_file(
+        self,
+        file_path: str,
+        __user__: dict,
+        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
+    ) -> str:
+        """
+        Read the contents of a file from the user's workspace.
+
+        :param file_path: Path to the file relative to the user's workspace (e.g., "notes.txt" or "project/main.py").
+
+        :return: A JSON object with the following fields: `file_path`, `status`, `content`. When `status` is "OK", the `content` field contains the file contents.
+        """
+        return await _Tools(self.valves).read_file(
+            file_path=file_path,
+            __event_emitter__=__event_emitter__,
+            __user__=__user__,
+        )
+
+    async def write_file(
+        self,
+        file_path: str,
+        content: str,
+        __user__: dict,
+        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
+    ) -> str:
+        """
+        Create or overwrite a file in the user's workspace.
+
+        :param file_path: Path to the file relative to the user's workspace. Directories will be created automatically.
+        :param content: The content to write to the file.
+
+        :return: A JSON object with the following fields: `file_path`, `status`, `message`. When `status` is "OK", the file was written successfully.
+        """
+        return await _Tools(self.valves).write_file(
+            file_path=file_path,
+            content=content,
+            __event_emitter__=__event_emitter__,
+            __user__=__user__,
+        )
+
+    async def edit_file(
+        self,
+        file_path: str,
+        old_text: str,
+        new_text: str,
+        __user__: dict,
+        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
+    ) -> str:
+        """
+        Edit a file by replacing text. Finds the first occurrence of old_text and replaces it with new_text.
+
+        :param file_path: Path to the file relative to the user's workspace.
+        :param old_text: The exact text to find in the file.
+        :param new_text: The text to replace it with.
+
+        :return: A JSON object with the following fields: `file_path`, `status`, `message`. When `status` is "OK", the edit was successful.
+        """
+        return await _Tools(self.valves).edit_file(
+            file_path=file_path,
+            old_text=old_text,
+            new_text=new_text,
+            __event_emitter__=__event_emitter__,
+            __user__=__user__,
+        )
+
+    async def display_image(
+        self,
+        file_path: str,
+        __user__: dict,
+        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
+    ) -> str:
+        """
+        Display an image file from the user's workspace. The image will be shown inline in the chat.
+
+        :param file_path: Path to the image file relative to the user's workspace (e.g., "photo.jpg"). Supports PNG, JPG, JPEG, GIF, WEBP, and SVG formats.
+
+        :return: A JSON object with the following fields: `file_path`, `status`, `message`. When `status` is "OK", the image has been displayed.
+        """
+        return await _Tools(self.valves).display_image(
+            file_path=file_path,
+            __event_emitter__=__event_emitter__,
+            __user__=__user__,
+        )
+
+    async def display_images(
+        self,
+        file_paths: list[str],
+        __user__: dict,
+        __event_emitter__: typing.Callable[[dict], typing.Any] = None,
+    ) -> str:
+        """
+        Display multiple image files from the user's workspace as a gallery. All images will be shown together inline in the chat. Use this instead of display_image when showing multiple images.
+
+        :param file_paths: List of paths to image files relative to the user's workspace (e.g., ["photo1.jpg", "photo2.png"]). Supports PNG, JPG, JPEG, GIF, WEBP, and SVG formats.
+
+        :return: A JSON object with the following fields: `file_paths`, `status`, `message`, `results`. When `status` is "OK", all images have been displayed.
+        """
+        return await _Tools(self.valves).display_images(
+            file_paths=file_paths,
             __event_emitter__=__event_emitter__,
             __user__=__user__,
         )
