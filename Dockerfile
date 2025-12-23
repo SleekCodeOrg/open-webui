@@ -35,7 +35,7 @@ WORKDIR /app
 RUN apk add --no-cache git
 
 COPY package.json package-lock.json ./
-RUN npm ci --force
+RUN npm install --legacy-peer-deps
 
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
@@ -185,19 +185,13 @@ RUN if [ "$USE_PERMISSION_HARDENING" = "true" ]; then \
     find /root -type d -exec chmod g+s {} + || true; \
     fi
 
-USER $UID:$GID
-
-ARG BUILD_HASH
-ENV WEBUI_BUILD_VERSION=${BUILD_HASH}
-ENV DOCKER=true
-
+# Install gVisor runsc and additional dependencies for code execution
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y </dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y wget </dev/null
 
 RUN wget -O /tmp/runsc "https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)/runsc" && \
     wget -O /tmp/runsc.sha512 "https://storage.googleapis.com/gvisor/releases/release/latest/$(uname -m)/runsc.sha512" && \
     cd /tmp && sha512sum -c runsc.sha512 && \
     chmod 555 /tmp/runsc && rm /tmp/runsc.sha512 && mv /tmp/runsc /usr/bin/runsc
-
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -y </dev/null && \
@@ -219,5 +213,11 @@ RUN apt-get update && \
       pyarrow polars duckdb \
       openpyxl lxml beautifulsoup4 \
       yfinance
+
+USER $UID:$GID
+
+ARG BUILD_HASH
+ENV WEBUI_BUILD_VERSION=${BUILD_HASH}
+ENV DOCKER=true
 
 CMD [ "bash", "start.sh"]
