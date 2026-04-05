@@ -36,7 +36,7 @@ WORKDIR /app
 RUN apk add --no-cache git
 
 COPY package.json package-lock.json ./
-RUN npm install --legacy-peer-deps
+RUN npm ci
 
 COPY . .
 ENV APP_BUILD_HASH=${BUILD_HASH}
